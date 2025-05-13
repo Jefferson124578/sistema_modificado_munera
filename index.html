@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sistema Profissional de Estoque</title>
+<!-- FontAwesome para ícones -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+<!-- Chart.js para gráficos -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- jsPDF para exportação PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>~
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<div id="app" aria-live="polite" aria-atomic="true">
+  <header>
+  <h1>
+    📦​Sistema Profissional de Estoque Munera​📦​
+  </h1>
+  <button id="darkModeToggle" aria-label="Alternar modo escuro" title="Alternar modo escuro">
+    <i class="fas fa-moon"></i>
+  </button>
+</header>
+
+
+  <!-- Login -->
+  <section id="loginPage" aria-label="Página de login">
+    <h2>Login</h2>
+    <form id="loginForm" novalidate>
+      <label for="username">Usuário</label>
+      <input type="text" id="username" name="username" autocomplete="username" required />
+      <label for="password">Senha</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required />
+      <button type="submit">Entrar</button>
+      <div id="loginError" role="alert" aria-live="assertive"></div>
+    </form>
+  </section>
+
+  <!-- Sistema -->
+  <section id="system" hidden>
+    <nav class="tabs" role="tablist" aria-label="Seções do sistema">
+      <button class="tab active" role="tab" aria-selected="true" aria-controls="tab-dashboard" id="tab-dashboard-btn">Dashboard</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="tab-stock" id="tab-stock-btn">Estoque</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="tab-history" id="tab-history-btn">Histórico</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="tab-report" id="tab-report-btn">Relatório</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="tab-categories" id="tab-categories-btn">Categorias</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="tab-users" id="tab-users-btn" hidden>Usuários</button>
+      <button class="tab" id="btnLogout" style="margin-left:auto; background:var(--danger); color:white;" aria-label="Sair do sistema"><i class="fas fa-sign-out-alt"></i> Sair</button>
+    </nav>
+
+    <main>
+      <!-- Dashboard -->
+      <section id="tab-dashboard" role="tabpanel" aria-labelledby="tab-dashboard-btn">
+        <h2>Dashboard</h2>
+        <div id="dashboard">
+          <div class="charts">
+            <canvas id="chartStockLevels" aria-label="Gráfico de níveis de estoque" role="img"></canvas>
+            <canvas id="chartMovements" aria-label="Gráfico de movimentações recentes" role="img"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Estoque -->
+      <section id="tab-stock" role="tabpanel" aria-labelledby="tab-stock-btn" hidden>
+        <form id="productForm" aria-label="Formulário para adicionar ou editar produtos" novalidate>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="productName">Nome do Produto</label>
+              <input type="text" id="productName" name="productName" autocomplete="off" required />
+            </div>
+            <div class="form-group">
+              <label for="productQuantity">Quantidade</label>
+              <input type="number" id="productQuantity" name="productQuantity" min="0" required />
+            </div>
+            <div class="form-group">
+              <label for="productCategory">Categoria</label>
+              <select id="productCategory" name="productCategory" required></select>
+            </div>
+            <div class="form-group" style="align-self:flex-end;">
+              <button type="submit" class="btn-primary" id="btnAddUpdate" aria-label="Adicionar produto">
+                <i class="fas fa-plus"></i> Adicionar Produto
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <div class="search-container" style="margin-bottom:1rem;">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Pesquisar produto..."
+            aria-label="Pesquisar produto"
+            autocomplete="off"
+          />
+          <i class="fas fa-search"></i>
+        </div>
+
+        <div class="table-container" aria-label="Tabela de estoque">
+          <table id="stockTable" role="grid" aria-describedby="summaryInfo">
+            <thead>
+              <tr>
+                <th scope="col">Produto</th>
+                <th scope="col">Categoria</th>
+                <th scope="col">Estoque</th>
+                <th scope="col">Status</th>
+                <th scope="col" style="min-width: 180px;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="stockBody"></tbody>
+          </table>
+        </div>
+
+        <section class="summary" aria-live="polite" id="summaryInfo">
+          <div id="totalProducts">Produtos cadastrados: 0</div>
+          <div id="totalQuantity">Quantidade total em estoque: 0</div>
+          <div id="categoriesCount">Categorias: 0</div>
+        </section>
+      </section>
+
+      <!-- Histórico -->
+      <section id="tab-history" role="tabpanel" aria-labelledby="tab-history-btn" hidden>
+        <h2>Histórico de Movimentações</h2>
+        <div class="form-row" style="margin-top:1rem; margin-bottom:1rem;">
+          <div class="form-group">
+            <label for="filterType">Tipo de Movimentação</label>
+            <select id="filterType" aria-label="Filtrar por tipo de movimentação">
+              <option value="all" selected>Todos</option>
+              <option value="entrada">Entrada</option>
+              <option value="saida">Saída</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="filterCategory">Categoria</label>
+            <select id="filterCategory" aria-label="Filtrar por categoria"></select>
+          </div>
+          <div class="form-group" style="flex:1 1 300px;">
+            <label for="filterSearch">Pesquisar Produto</label>
+            <input type="text" id="filterSearch" placeholder="Pesquisar no histórico..." aria-label="Pesquisar no histórico" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="table-container" style="margin-top:1rem;">
+          <table id="historyTable" role="grid" aria-label="Tabela de histórico de movimentações">
+            <thead>
+              <tr>
+                <th scope="col">Data e Hora</th>
+                <th scope="col">Produto</th>
+                <th scope="col">Categoria</th>
+                <th scope="col">Tipo</th>
+                <th scope="col">Quantidade</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+          <div class="pagination" id="historyPagination"></div>
+        </div>
+      </section>
+
+      <!-- Relatório -->
+      <section id="tab-report" role="tabpanel" aria-labelledby="tab-report-btn" hidden>
+        <h2>Relatório de Estoque</h2>
+        <p>Exportar dados do estoque atual em CSV ou PDF para análise externa.</p>
+        <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:1rem;">
+          <button class="btn-primary" id="btnExportCSV" aria-label="Exportar relatório CSV">
+            <i class="fas fa-file-csv"></i> Exportar CSV
+          </button>
+          <button class="btn-primary" id="btnExportPDF" aria-label="Exportar relatório PDF">
+            <i class="fas fa-file-pdf"></i> Exportar PDF
+          </button>
+        </div>
+      </section>
+
+      <!-- Categorias -->
+      <section id="tab-categories" role="tabpanel" aria-labelledby="tab-categories-btn" hidden>
+        <h2>Gerenciar Categorias</h2>
+        <form id="categoryForm" aria-label="Formulário para adicionar categorias" novalidate style="margin-bottom:1rem;">
+          <div class="form-row" style="align-items:flex-end;">
+            <div class="form-group" style="flex:1 1 300px;">
+              <label for="categoryName">Nome da Categoria</label>
+              <input type="text" id="categoryName" name="categoryName" autocomplete="off" required />
+            </div>
+            <div>
+              <button type="submit" class="btn-primary" id="btnAddCategory" aria-label="Adicionar categoria">
+                <i class="fas fa-plus"></i> Adicionar Categoria
+              </button>
+            </div>
+          </div>
+        </form>
+        <div class="table-container" aria-label="Tabela de categorias">
+          <table id="categoryTable" role="grid" style="min-width: 400px;">
+            <thead>
+              <tr>
+                <th scope="col">Categoria</th>
+                <th scope="col" style="min-width: 140px;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="categoryBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Usuários (admin) -->
+      <section id="tab-users" role="tabpanel" aria-labelledby="tab-users-btn" hidden>
+        <h2>Gerenciar Usuários</h2>
+        <form id="userForm" aria-label="Formulário para adicionar usuários" novalidate style="margin-bottom:1rem;">
+          <div class="form-row" style="align-items:flex-end;">
+            <div class="form-group" style="flex:1 1 200px;">
+              <label for="userName">Nome do Usuário</label>
+              <input type="text" id="userName" name="userName" autocomplete="off" required />
+            </div>
+            <div class="form-group" style="flex:1 1 200px;">
+              <label for="userRole">Função</label>
+              <select id="userRole" name="userRole" required>
+                <option value="" disabled selected>Selecione a função</option>
+                <option value="admin">Administrador</option>
+                <option value="user">Usuário</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1 1 200px;">
+              <label for="userPassword">Senha</label>
+              <input type="password" id="userPassword" name="userPassword" autocomplete="new-password" required />
+            </div>
+            <div>
+              <button type="submit" class="btn-primary" id="btnAddUser" aria-label="Adicionar usuário">
+                <i class="fas fa-user-plus"></i> Adicionar Usuário
+              </button>
+            </div>
+          </div>
+        </form>
+        <div class="table-container" aria-label="Tabela de usuários">
+          <table id="userTable" role="grid" style="min-width: 600px;">
+            <thead>
+              <tr>
+                <th scope="col">Nome</th>
+                <th scope="col">Função</th>
+                <th scope="col" style="min-width: 140px;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="userBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </section>
+
+  <!-- Modal para movimentação (entrada/saída) -->
+  <div
+    class="modal-overlay"
+    id="modalOverlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modalTitle"
+    aria-describedby="modalDesc"
+  >
+    <div class="modal">
+      <button class="close-modal" aria-label="Fechar modal" id="closeModalBtn">&times;</button>
+      <h3 id="modalTitle">Registrar movimentação</h3>
+      <p id="modalDesc">Informe a quantidade para a movimentação:</p>
+      <input
+        type="number"
+        id="movementQuantity"
+        min="1"
+        aria-label="Quantidade para movimentação"
+        autocomplete="off"
+      />
+      <div class="modal-buttons">
+        <button class="btn-success" id="confirmEntryBtn" style="display:none;">Confirmar Entrada</button>
+        <button class="btn-warning" id="confirmExitBtn" style="display:none;">Confirmar Saída</button>
+        <button class="btn-danger" id="cancelMovementBtn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal confirmação -->
+  <div
+    class="modal-overlay"
+    id="confirmModalOverlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="confirmModalTitle"
+    aria-describedby="confirmModalDesc"
+  >
+    <div class="modal" style="max-width: 360px;">
+      <h3 id="confirmModalTitle">Confirmação</h3>
+      <p id="confirmModalDesc">Tem certeza que deseja realizar esta ação?</p>
+      <div class="modal-buttons">
+        <button class="btn-danger" id="confirmYesBtn">Sim</button>
+        <button class="btn-secondary" id="confirmNoBtn">Não</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert -->
+  <div id="alertMessage" class="alert" role="alert" aria-live="assertive"></div>
+
+<script src="script.js"></script>
+
+
+</body>
+</html>
